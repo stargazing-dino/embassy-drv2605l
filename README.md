@@ -1,224 +1,141 @@
 # embassy-drv2605l
 
-An async driver for the DRV2605L haptic motor controller, designed for use with Embassy-rs on embedded systems.
+Driver for the DRV2605L haptic motor controller with both blocking and async I2C support.
 
 ## Features
 
-- Async I2C communication using `embedded-hal-async`
-- Support for both ERM (Eccentric Rotating Mass) and LRA (Linear Resonant Actuator) motors
-- Access to all 123 built-in haptic effects
-- Real-time playback (RTP) mode for custom patterns
-- Waveform sequencing (up to 8 effects in sequence)
-- Pre-built heartbeat patterns with physiologically accurate timing
-- Optional `defmt` support for debugging
+- **Dual mode**: Both blocking and async I2C implementations
+- **Motor support**: ERM and LRA haptic motors
+- **123 built-in effects**: From clicks to buzzes to complex transitions
+- **Custom patterns**: Real-time playback mode for precise control
+- **Waveform sequencing**: Chain up to 8 effects
+- **Heartbeat patterns**: Realistic physiological haptic feedback
+- **`no_std` compatible**: For embedded systems
+- **Optional `defmt`**: Debug support when needed
 
 ## Installation
 
-Add this to your `Cargo.toml`:
-
 ```toml
 [dependencies]
+# For async (default)
 embassy-drv2605l = "0.1.0"
+
+# For blocking only
+embassy-drv2605l = { version = "0.1.0", default-features = false, features = ["blocking"] }
+
+# For both blocking and async
+embassy-drv2605l = { version = "0.1.0", features = ["blocking", "async"] }
 ```
 
-## Basic Usage
+## Quick Start
 
-### Simple Effect Playback
+### Async Mode
 
 ```rust
 use embassy_drv2605l::{Drv2605l, Effect};
 
-// Create the driver with your I2C instance
 let mut haptic = Drv2605l::new(i2c);
-
-// Initialize the driver (defaults to LRA motor)
 haptic.init().await?;
 
-// Play a strong click effect
+// Play a click
 haptic.play_waveform(Effect::StrongClick100.as_u8()).await?;
-
-// Play a double click
-haptic.play_waveform(Effect::DoubleClick100.as_u8()).await?;
 ```
 
-### Motor Type Configuration
+### Blocking Mode
+
+```rust
+use embassy_drv2605l::{Drv2605l, Effect};
+
+let mut haptic = Drv2605l::new(i2c);
+haptic.init()?;
+
+// Play a click  
+haptic.play_waveform(Effect::StrongClick100.as_u8())?;
+```
+
+## Common Usage Patterns
+
+### Motor Configuration
 
 ```rust
 use embassy_drv2605l::{Drv2605l, MotorType};
 
 let mut haptic = Drv2605l::new(i2c);
-
-// Configure for ERM motor before initialization
-haptic.set_motor_type(MotorType::ERM).await?;
+haptic.set_motor_type(MotorType::ERM).await?; // Default is LRA
 haptic.init().await?;
 ```
 
 ### Waveform Sequences
 
-Create complex haptic patterns by chaining multiple effects:
-
 ```rust
-// Clear any existing sequence
+// Chain multiple effects
 haptic.clear_waveform_sequence().await?;
-
-// Build a sequence: strong click, pause, double click
 haptic.set_waveform(0, Effect::StrongClick100.as_u8()).await?;
-haptic.set_waveform(1, 0x81).await?;  // 10ms pause
+haptic.set_waveform(1, 0x81).await?;  // 10ms pause  
 haptic.set_waveform(2, Effect::DoubleClick60.as_u8()).await?;
-haptic.set_waveform(3, 0).await?;  // End sequence
-
-// Play the sequence
+haptic.set_waveform(3, 0).await?;  // End marker
 haptic.go().await?;
 ```
 
-### Real-Time Playback (RTP)
-
-For custom haptic patterns with precise control:
+### Real-Time Playback
 
 ```rust
-use embassy_drv2605l::Mode;
-use embassy_time::{Duration, Timer};
-
-// Switch to RTP mode
+// Custom intensity control
 haptic.set_mode(Mode::RealTimePlayback).await?;
-
-// Create a simple pulse pattern
-for _ in 0..3 {
-    haptic.set_rtp_input(0x7F).await?;  // 50% intensity
-    Timer::after(Duration::from_millis(50)).await;
-    
-    haptic.set_rtp_input(0x00).await?;  // Off
-    Timer::after(Duration::from_millis(100)).await;
-}
+haptic.set_rtp_input(0x7F).await?;  // 50% intensity
+haptic.set_rtp_input(0xFF).await?;  // Full intensity
+haptic.set_rtp_input(0x00).await?;  // Stop
 ```
 
-## Heartbeat Patterns
-
-The driver includes specialized support for creating realistic heartbeat haptic patterns:
-
-### Using Built-in Effects
+### Heartbeat Patterns
 
 ```rust
-use embassy_drv2605l::heartbeat;
+use embassy_drv2605l::HeartbeatPattern;
 
-// Simple heartbeat using library effects
-haptic.play_double_click_heartbeat().await?;
-
-// More complex heartbeat sequence
+// Built-in heartbeat
 haptic.play_heartbeat_builtin().await?;
-```
 
-### Custom Heartbeat Patterns
-
-```rust
-use embassy_drv2605l::heartbeat::{HeartbeatPattern};
-
-// Create a custom heartbeat pattern
+// Custom heartbeat (async only)
 let pattern = HeartbeatPattern {
-    bpm: 70,           // 70 beats per minute
-    s1_amplitude: 0x60,  // "Lub" strength (75%)
-    s2_amplitude: 0x38,  // "Dub" strength (45%)
+    bpm: 70,
+    s1_amplitude: 0x60,  // "Lub" strength  
+    s2_amplitude: 0x38,  // "Dub" strength
 };
-
-// This will play continuously
 haptic.play_custom_heartbeat(&pattern).await?;
 ```
 
-## Available Effects
+## Popular Effects
 
-The library includes all 123 built-in DRV2605L effects. Some commonly used ones:
+- **Clicks**: `StrongClick100`, `SharpClick60`, `SoftBump100`
+- **Alerts**: `DoubleClick100`, `TripleClick100`, `Alert750ms`  
+- **Transitions**: `TransitionRampUpShortSmooth1_100`
+- **Buzzes**: `StrongBuzz100`, `SmoothHum1_50`
 
-- `StrongClick100` - Strong, sharp click at full intensity
-- `SoftBump100` - Soft, rounded bump sensation
-- `DoubleClick100` - Two quick clicks (great for heartbeats)
-- `Alert750ms` - Long alert vibration
-- `TransitionRampUpShortSmooth1_100` - Smooth ramp up effect
+123 effects total - see `Effect` enum for complete list.
 
-See the `Effect` enum in the source code for the complete list.
+## Timing in Sequences
 
-## Pause/Delay Encoding
-
-When building waveform sequences, you can insert delays between effects:
-
-- Delays are encoded as `0x80 | delay_value`
-- Each unit represents 10ms
-- Maximum delay: 1270ms (0xFF)
-
-Example:
-```rust
-haptic.set_waveform(1, 0x81).await?;  // 10ms delay
-haptic.set_waveform(2, 0x8A).await?;  // 100ms delay
-haptic.set_waveform(3, 0xFF).await?;  // 1270ms delay
-```
-
-## Power Management
+Insert delays between effects: `0x80 | (delay_ms / 10)`
 
 ```rust
-// Enter standby mode to save power
-haptic.enter_standby().await?;
-
-// Wake up from standby
-haptic.exit_standby().await?;
+haptic.set_waveform(1, 0x81).await?;  // 10ms
+haptic.set_waveform(2, 0x8A).await?;  // 100ms  
+haptic.set_waveform(3, 0xFF).await?;  // 1270ms (max)
 ```
 
-## Example: Complete Haptic Feedback System
+## Hardware
 
-```rust
-use embassy_drv2605l::{Drv2605l, Effect, Mode};
-use embassy_time::{Duration, Timer};
+**I2C Connection** (Address: `0x5A`)
+- VIN → 3.3V
+- GND → Ground  
+- SDA → I2C Data
+- SCL → I2C Clock
+- EN → High (or leave - has pullup)
 
-async fn haptic_demo(i2c: impl I2c) -> Result<(), Error> {
-    let mut haptic = Drv2605l::new(i2c);
-    haptic.init().await?;
-    
-    // Button press feedback
-    haptic.play_waveform(Effect::SharpClick100.as_u8()).await?;
-    Timer::after(Duration::from_millis(500)).await;
-    
-    // Success notification
-    haptic.play_waveform(Effect::DoubleClick100.as_u8()).await?;
-    Timer::after(Duration::from_millis(500)).await;
-    
-    // Error notification
-    for _ in 0..3 {
-        haptic.play_waveform(Effect::StrongBuzz100.as_u8()).await?;
-        Timer::after(Duration::from_millis(200)).await;
-    }
-    
-    // Enter low-power mode
-    haptic.enter_standby().await?;
-    
-    Ok(())
-}
-```
-
-## Hardware Setup
-
-The DRV2605L communicates over I2C at address `0x5A`. When using the Adafruit breakout board:
-
-- Connect VIN to 3.3V (not 5V)
-- Connect GND to ground
-- Connect SDA to your I2C data line
-- Connect SCL to your I2C clock line
-- The EN pin must be high for operation (pulled up on the breakout)
-
-## Motor Selection
-
-**LRA (Linear Resonant Actuator)** - Recommended for:
-- Precise, crisp haptic feedback
-- Lower power consumption
-- Heartbeat and subtle patterns
-
-**ERM (Eccentric Rotating Mass)** - Better for:
-- Strong vibrations
-- Legacy compatibility
-- Simple on/off patterns
+**Motor Types**
+- **LRA**: Precise feedback, low power, best for subtle patterns
+- **ERM**: Strong vibration, simple on/off control
 
 ## License
 
-This project is licensed under either of:
-
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
-
-at your option.
+MIT OR Apache-2.0
