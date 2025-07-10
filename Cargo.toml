@@ -2,7 +2,6 @@
 name = "embassy-drv2605l"
 version = "0.1.0"
 edition = "2021"
-authors = ["Rex Magana"]
 license = "MIT OR Apache-2.0"
 description = "Embassy-rs async driver for DRV2605L haptic driver"
 repository = "https://github.com/yourusername/embassy-drv2605l"
