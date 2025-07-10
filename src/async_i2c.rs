@@ -1,4 +1,4 @@
-use crate::common::{DRV2605L_ADDR, Error, Library, Mode, MotorType};
+use crate::common::{Error, Library, Mode, MotorType, DRV2605L_ADDR};
 use crate::registers;
 use embassy_time::{Duration, Timer};
 use embedded_hal_async::i2c::I2c;
@@ -22,17 +22,19 @@ where
     pub async fn init(&mut self) -> Result<(), Error<E>> {
         self.reset().await?;
         Timer::after(Duration::from_millis(2)).await;
-        
+
         self.exit_standby().await?;
-        
+
         if self.motor_type == MotorType::LRA {
-            self.write_register(registers::FEEDBACK_CONTROL, 0x80).await?;
+            self.write_register(registers::FEEDBACK_CONTROL, 0x80)
+                .await?;
             self.set_library(Library::LRA).await?;
         } else {
-            self.write_register(registers::FEEDBACK_CONTROL, 0x00).await?;
+            self.write_register(registers::FEEDBACK_CONTROL, 0x00)
+                .await?;
             self.set_library(Library::LibraryB).await?;
         }
-        
+
         Ok(())
     }
 
@@ -55,19 +57,22 @@ where
     }
 
     pub async fn set_library(&mut self, library: Library) -> Result<(), Error<E>> {
-        self.write_register(registers::LIBRARY_SELECTION, library as u8).await
+        self.write_register(registers::LIBRARY_SELECTION, library as u8)
+            .await
     }
 
     pub async fn set_motor_type(&mut self, motor_type: MotorType) -> Result<(), Error<E>> {
         self.motor_type = motor_type;
-        
+
         match motor_type {
             MotorType::LRA => {
-                self.write_register(registers::FEEDBACK_CONTROL, 0x80).await?;
+                self.write_register(registers::FEEDBACK_CONTROL, 0x80)
+                    .await?;
                 self.set_library(Library::LRA).await
             }
             MotorType::ERM => {
-                self.write_register(registers::FEEDBACK_CONTROL, 0x00).await?;
+                self.write_register(registers::FEEDBACK_CONTROL, 0x00)
+                    .await?;
                 self.set_library(Library::LibraryB).await
             }
         }
@@ -90,7 +95,7 @@ where
         if slot > 7 {
             return Err(Error::InvalidParameter);
         }
-        
+
         let reg = registers::WAVEFORM_SEQUENCER_1 + slot;
         self.write_register(reg, effect).await
     }
@@ -134,43 +139,44 @@ where
             .map_err(Error::I2c)?;
         Ok(buf[0])
     }
-    
+
     pub async fn set_rated_voltage(&mut self, mv: u16) -> Result<(), Error<E>> {
         let value = ((mv as u32 * 255) / 5600) as u8;
         self.write_register(registers::RATED_VOLTAGE, value).await
     }
-    
+
     pub async fn set_overdrive_voltage(&mut self, mv: u16) -> Result<(), Error<E>> {
         let value = ((mv as u32 * 255) / 5600) as u8;
-        self.write_register(registers::OVERDRIVE_CLAMP_VOLTAGE, value).await
+        self.write_register(registers::OVERDRIVE_CLAMP_VOLTAGE, value)
+            .await
     }
-    
+
     pub async fn get_device_id(&mut self) -> Result<u8, Error<E>> {
         let status = self.read_register(registers::STATUS).await?;
         Ok((status >> 5) & 0x07)
     }
-    
+
     pub async fn auto_calibrate(&mut self) -> Result<(), Error<E>> {
         self.set_mode(Mode::AutoCalibration).await?;
         self.go().await?;
-        
+
         // Wait for calibration to complete
         let mut timeout = 100;
         while self.is_playing().await? && timeout > 0 {
             Timer::after(Duration::from_millis(10)).await;
             timeout -= 1;
         }
-        
+
         if timeout == 0 {
             return Err(Error::CalibrationFailed);
         }
-        
+
         // Check if calibration was successful
         let status = self.read_register(registers::STATUS).await?;
         if status & 0x08 != 0 {
             return Err(Error::CalibrationFailed);
         }
-        
+
         Ok(())
     }
 }

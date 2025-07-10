@@ -9,7 +9,6 @@ Driver for the DRV2605L haptic motor controller with both blocking and async I2C
 - **123 built-in effects**: From clicks to buzzes to complex transitions
 - **Custom patterns**: Real-time playback mode for precise control
 - **Waveform sequencing**: Chain up to 8 effects
-- **Heartbeat patterns**: Realistic physiological haptic feedback
 - **`no_std` compatible**: For embedded systems
 - **Optional `defmt`**: Debug support when needed
 
@@ -85,23 +84,6 @@ haptic.set_mode(Mode::RealTimePlayback).await?;
 haptic.set_rtp_input(0x7F).await?;  // 50% intensity
 haptic.set_rtp_input(0xFF).await?;  // Full intensity
 haptic.set_rtp_input(0x00).await?;  // Stop
-```
-
-### Heartbeat Patterns
-
-```rust
-use embassy_drv2605l::HeartbeatPattern;
-
-// Built-in heartbeat
-haptic.play_heartbeat_builtin().await?;
-
-// Custom heartbeat (async only)
-let pattern = HeartbeatPattern {
-    bpm: 70,
-    s1_amplitude: 0x60,  // "Lub" strength  
-    s2_amplitude: 0x38,  // "Dub" strength
-};
-haptic.play_custom_heartbeat(&pattern).await?;
 ```
 
 ## Popular Effects

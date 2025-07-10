@@ -1,4 +1,4 @@
-use crate::common::{DRV2605L_ADDR, Error, Library, Mode, MotorType};
+use crate::common::{Error, Library, Mode, MotorType, DRV2605L_ADDR};
 use crate::registers;
 use embedded_hal::i2c::I2c;
 
@@ -20,12 +20,12 @@ where
 
     pub fn init(&mut self) -> Result<(), Error<E>> {
         self.reset()?;
-        
+
         // Wait 2ms after reset
         // In blocking mode, user must handle delay externally
-        
+
         self.exit_standby()?;
-        
+
         if self.motor_type == MotorType::LRA {
             self.write_register(registers::FEEDBACK_CONTROL, 0x80)?;
             self.set_library(Library::LRA)?;
@@ -33,7 +33,7 @@ where
             self.write_register(registers::FEEDBACK_CONTROL, 0x00)?;
             self.set_library(Library::LibraryB)?;
         }
-        
+
         Ok(())
     }
 
@@ -61,7 +61,7 @@ where
 
     pub fn set_motor_type(&mut self, motor_type: MotorType) -> Result<(), Error<E>> {
         self.motor_type = motor_type;
-        
+
         match motor_type {
             MotorType::LRA => {
                 self.write_register(registers::FEEDBACK_CONTROL, 0x80)?;
@@ -91,7 +91,7 @@ where
         if slot > 7 {
             return Err(Error::InvalidParameter);
         }
-        
+
         let reg = registers::WAVEFORM_SEQUENCER_1 + slot;
         self.write_register(reg, effect)
     }
@@ -133,17 +133,17 @@ where
             .map_err(Error::I2c)?;
         Ok(buf[0])
     }
-    
+
     pub fn set_rated_voltage(&mut self, mv: u16) -> Result<(), Error<E>> {
         let value = ((mv as u32 * 255) / 5600) as u8;
         self.write_register(registers::RATED_VOLTAGE, value)
     }
-    
+
     pub fn set_overdrive_voltage(&mut self, mv: u16) -> Result<(), Error<E>> {
         let value = ((mv as u32 * 255) / 5600) as u8;
         self.write_register(registers::OVERDRIVE_CLAMP_VOLTAGE, value)
     }
-    
+
     pub fn get_device_id(&mut self) -> Result<u8, Error<E>> {
         let status = self.read_register(registers::STATUS)?;
         Ok((status >> 5) & 0x07)
